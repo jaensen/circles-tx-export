@@ -1,0 +1,8 @@
+services:
+  tx-exporter:
+    restart: unless-stopped
+    build:
+      dockerfile: ${PWD}/Dockerfile
+      context: ${PWD}
+    environment:
+      INDEX_DB_PASSWORD: ${INDEXER_DB_POSTGRES_PASSWORD}

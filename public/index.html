@@ -1,0 +1,54 @@
+<html>
+<head>
+    <title>circles-tx-export</title>
+    <script src="viz.js/viz.js"></script>
+    <script src="viz.js/full.render.js"></script>
+    <script>
+        // when loaded
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('renderButton').addEventListener('click', function (e) {
+                console.log("renderButton clicked")
+                e.preventDefault();
+
+                // fetch the graph from /api/showTransactionGraph
+                const txHash = document.getElementById('hash').value;
+                const unit = document.getElementById('unit').value;
+                let url = '/api/showTransactionGraph?hash=' + txHash;
+
+                if (unit === 'CRC') {
+                    url += '&showCrc=true';
+                }
+
+                fetch(url)
+                    .then(async function (response) {
+                        const graph = document.getElementById('graph');
+                        const viz = new Viz();
+                        const dot = await response.text();
+
+                        viz.renderSVGElement(dot)
+                            .then(function (element) {
+                                graph.innerHTML = "";
+                                graph.appendChild(element);
+                            });
+                    })
+                    .then(function (data) {
+                        console.log(data);
+                    });
+            });
+        });
+    </script>
+</head>
+<body>
+<label for="hash">Tx Hash:</label>
+<input id="hash" type="text" name="hash" placeholder="Transaction hash">
+
+<!-- Options: either 'CRC' or 'TCRC' -->
+<label for="unit">Unit:</label>
+<select id="unit" name="unit">
+    <option value="CRC">CRC</option>
+    <option value="TCRC" selected>TCRC</option>
+</select>
+<input id="renderButton" type="submit" value="Render graph">
+<div id="graph"></div>
+</body>
+</html>
