@@ -1,7 +1,7 @@
 import express, {Request, Response} from 'express';
 import {generateTransactionHtmlTable} from "./lib/htmlOutput";
 import {findTransactions} from "./exports/transactionListExport";
-import {generateGraphFromTx} from "./exports/transactionDetailExport";
+import {transactionDetailGraph, trustGraph} from "./exports/transactionDetailExport";
 
 const app = express();
 const port = 3000;
@@ -18,9 +18,18 @@ app.get('/api/findTransactions', async (req: Request, res: Response) => {
 });
 
 app.get('/api/showTransactionGraph', async (req: Request, res: Response) => {
-    const hash = req.query.hash as string;
+    const txHash = req.query.txHash as string;
+
     const showCrc = !!req.query.showCrc;
-    const dot = await generateGraphFromTx(hash, !showCrc);
+    const dot = await transactionDetailGraph(txHash, !showCrc);
+
+    res.contentType('text/vnd.graphviz');
+    res.send(dot);
+});
+
+app.get('/api/showTrustGraph', async (req: Request, res: Response) => {
+    const address = req.query.address as string;
+    const dot = await trustGraph(address);
 
     res.contentType('text/vnd.graphviz');
     res.send(dot);

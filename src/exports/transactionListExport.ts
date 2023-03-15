@@ -3,6 +3,9 @@ import {queryCirclesGardenRemote} from "../lib/circlesGardenProfiles";
 import {pool} from "../lib/db";
 
 async function findUniqueFromAddresses(recipientAddress: string): Promise<string[]> {
+    if ((recipientAddress?.trim() ?? "") == "") {
+        return [];
+    }
     const client = await pool.connect();
 
     try {
@@ -11,7 +14,7 @@ async function findUniqueFromAddresses(recipientAddress: string): Promise<string
                              , t.from
                              , t.to
                              , t.value / 1000000000000000000 as crc
-                             , crc_to_tc(extract(epoch from t.timestamp at time zone 'utc'), t.value) /
+                             , crc_to_tc(extract(epoch from t.timestamp at time zone 'utc') * 1000, t.value) /
                                1000000000000000000           as tc
                         from crc_all_signups s
                                  join crc_hub_transfer_2 t on t."to" = s.user
@@ -32,6 +35,9 @@ async function findUniqueFromAddresses(recipientAddress: string): Promise<string
 }
 
 export async function findTransactions(recipientAddress: string): Promise<Transaction[]> {
+    if ((recipientAddress?.trim() ?? "") == "") {
+        return [];
+    }
     const uniqueFromAddresses = await findUniqueFromAddresses(recipientAddress);
     const profiles = await queryCirclesGardenRemote(uniqueFromAddresses);
 
@@ -43,7 +49,7 @@ export async function findTransactions(recipientAddress: string): Promise<Transa
                  , t.from
                  , t.to
                  , (t.value / 1000000000000000000)::text as crc
-                 , (crc_to_tc(extract(epoch from t.timestamp at time zone 'utc'), t.value) / 1000000000000000000)::text as tc
+                 , (crc_to_tc(extract(epoch from t.timestamp at time zone 'utc') * 1000, t.value) / 1000000000000000000)::text as tc
             from crc_all_signups s
                      join crc_hub_transfer_2 t on t."to" = s.user
             where s.user = lower($1)

@@ -4,51 +4,75 @@
     <script src="viz.js/viz.js"></script>
     <script src="viz.js/full.render.js"></script>
     <script>
-        // when loaded
-        document.addEventListener('DOMContentLoaded', function () {
-            document.getElementById('renderButton').addEventListener('click', function (e) {
-                console.log("renderButton clicked")
-                e.preventDefault();
+        function renderDot(url) {
+            fetch(url)
+                .then(async function (response) {
+                    const graph = document.getElementById('graph');
+                    const viz = new Viz();
+                    const dot = await response.text();
 
-                // fetch the graph from /api/showTransactionGraph
-                const txHash = document.getElementById('hash').value;
-                const unit = document.getElementById('unit').value;
-                let url = '/api/showTransactionGraph?hash=' + txHash;
+                    viz.renderSVGElement(dot)
+                        .then(function (element) {
+                            graph.innerHTML = "";
+                            graph.appendChild(element);
+                        });
+                })
+        }
 
-                if (unit === 'CRC') {
-                    url += '&showCrc=true';
-                }
+        function generateTransactionGraph() {
+            const unit = document.getElementById('unit').value;
+            const txHash = document.getElementById('txHash').value;
 
-                fetch(url)
-                    .then(async function (response) {
-                        const graph = document.getElementById('graph');
-                        const viz = new Viz();
-                        const dot = await response.text();
+            let url = '/api/showTransactionGraph?hash=' + txHash;
 
-                        viz.renderSVGElement(dot)
-                            .then(function (element) {
-                                graph.innerHTML = "";
-                                graph.appendChild(element);
-                            });
-                    })
-                    .then(function (data) {
-                        console.log(data);
-                    });
-            });
-        });
+            if (unit === 'CRC') {
+                url += '&showCrc=true';
+            }
+
+            renderDot(url);
+        }
+
+        function generateTrustGraph() {
+            const safeAddress = document.getElementById('safeAddress').value;
+            const url = '/api/showTrustGraph?address=' + safeAddress;
+
+            renderDot(url + '?' + new URLSearchParams({address:safeAddress}));
+        }
     </script>
 </head>
 <body>
-<label for="hash">Tx Hash:</label>
-<input id="hash" type="text" name="hash" placeholder="Transaction hash">
+    <table>
+        <tr>
+            <td>
+                <label for="txHash">Tx Hash:</label>
+            </td>
+            <td>
+                <input style="width: 500px;" id="txHash" type="text" name="txHash" placeholder="Transaction hash">
+            </td>
+            <td>
+                <label for="unit">Unit:</label>
+            </td>
+            <td>
+                <select id="unit" name="unit">
+                    <option value="CRC">CRC</option>
+                    <option value="TCRC" selected>TCRC</option>
+                </select>
+            </td>
+        </tr>
+    </table>
+    <button onclick="generateTransactionGraph()">Render graph</button>
+    <table>
+        <tr>
+            <td>
+                <label for="safeAddress">Safe address:</label>
+            </td>
+            <td>
+                <input style="width: 500px;" id="safeAddress" type="text" name="safeAddress" placeholder="Safe address">
+            </td>
+        </tr>
+    </table>
+    <button onclick="generateTrustGraph()">Render graph</button>
 
-<!-- Options: either 'CRC' or 'TCRC' -->
-<label for="unit">Unit:</label>
-<select id="unit" name="unit">
-    <option value="CRC">CRC</option>
-    <option value="TCRC" selected>TCRC</option>
-</select>
-<input id="renderButton" type="submit" value="Render graph">
 <div id="graph"></div>
 </body>
 </html>

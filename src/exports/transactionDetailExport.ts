@@ -1,7 +1,75 @@
 import {pool} from "../lib/db";
 import {queryCirclesGardenRemote} from "../lib/circlesGardenProfiles";
+import Web3 from "web3";
 
-export async function generateGraphFromTx(txHash: string, showTc:boolean = true): Promise<string> {
+export async function trustGraph(address:string) : Promise<string> {
+    const client = await pool.connect();
+
+    try {
+        const query = `
+            select last_change, "user", can_send_to, "limit"
+            from crc_current_trust_2 t
+            where t."user" = lower($1)
+               or t.can_send_to = lower($1);
+        `;
+
+        const {rows} = await client.query(query, [address]);
+
+        const addresses: { [x:string]:any } = {};
+        const edges: { [user:string]: { can_send_to: string, limit: number } } = {};
+
+        rows.forEach((row: any) => {
+            addresses[row.user] = true;
+            addresses[row.can_send_to] = true;
+            if (row.user === row.can_send_to) {
+                return;
+            }
+            edges[row.user] = {
+                can_send_to: row.can_send_to,
+                limit: row.limit
+            };
+        });
+
+        const uniqueAddresses = Object.keys(addresses);
+        const profiles = await queryCirclesGardenRemote(uniqueAddresses);
+
+        const web3 = new Web3();
+
+        const nodes:any[] = []
+        Object.keys(edges).forEach((user: any) => {
+            const can_send_to = edges[user].can_send_to;
+            const from = (profiles[user] ? profiles[user].username : user).toString();
+            const to = (profiles[can_send_to] ? profiles[can_send_to].username : can_send_to).toString();
+            nodes.push(`"${from}" [URL="https://circles.garden/profile/${web3.utils.toChecksumAddress(user)}"];`);
+            nodes.push(`"${to}" [URL="https://circles.garden/profile/${web3.utils.toChecksumAddress(can_send_to)}"];`);
+        });
+
+        const uniqueNodes = [...new Set(nodes)];
+
+        const dot = `
+digraph G {
+    rankdir=LR;
+    node [shape=box];
+    ${uniqueNodes.join("\n")}
+    ${Object.keys(edges).map((user: any) => {
+            const can_send_to = edges[user].can_send_to;
+            const limit = edges[user].limit;
+            const from = (profiles[user] ? profiles[user].username : user).toString();
+            const to = (profiles[can_send_to] ? profiles[can_send_to].username : can_send_to).toString();
+            return `"${from}" -> "${to}" [label="${limit}%"]`;
+        }).join("\n")}
+}`;
+        return dot;
+
+    } finally {
+        client.release();
+    }
+}
+
+export async function transactionDetailGraph(txHash: string, showTc:boolean = true): Promise<string> {
+    if ((txHash?.trim() ?? "") == "") {
+        return "";
+    }
     const client = await pool.connect();
 
     try {
@@ -38,24 +106,35 @@ export async function generateGraphFromTx(txHash: string, showTc:boolean = true)
             addresses[row.step_token_owner] = true;
         });
 
-        // Load the circles garden profiles for all addresses from remote
         const uniqueFromAddresses = Object.keys(addresses);
         const profiles = await queryCirclesGardenRemote(uniqueFromAddresses);
 
-        // Generate a graphviz dot file from the single steps
+        const web3 = new Web3();
+
+
+        const nodes:any[] = []
+        rows.forEach((row: any) => {
+            const from = (profiles[row.step_from] ? profiles[row.step_from].username : row.step_from).toString();
+            const to = (profiles[row.step_to] ? profiles[row.step_to].username : row.step_to).toString();
+            nodes.push(`"${from}" [URL="https://circles.garden/profile/${web3.utils.toChecksumAddress(row.step_from)}"];`);
+            nodes.push(`"${to}" [URL="https://circles.garden/profile/${web3.utils.toChecksumAddress(row.step_to)}"];`);
+        });
+
+        const uniqueNodes = [...new Set(nodes)];
+
         const dot = `
 digraph G {
     rankdir=LR;
     node [shape=box];
     "Source" -> "Sink" [label="${fullAmount} ${showTc ? "TCRC" : "CRC"}"] ;
+    ${uniqueNodes.join("\n")}
     ${rows.map((row: any) => {
         const from = profiles[row.step_from] ? profiles[row.step_from].username : row.step_from;
         const to = profiles[row.step_to] ? profiles[row.step_to].username : row.step_to;
         const tokenOwner = profiles[row.step_token_owner] ? profiles[row.step_token_owner].username : row.step_token_owner;
-        return `"${from}" -> "${to}" [label="${showTc ? row.step_tc : row.step_crc}\\n${tokenOwner} ${showTc ? "TCRC" : "CRC"}"]`;
+        return `"${from}" -> "${to}" [label="${showTc ? row.step_tc : row.step_crc}\\n${tokenOwner} ${showTc ? "TCRC" : "CRC"}" labelURL="https://circles.garden/profile/${web3.utils.toChecksumAddress(row.step_token_owner)}"]`;
     }).join("\n")}
 }`;
-
         return dot;
 
     } finally {
