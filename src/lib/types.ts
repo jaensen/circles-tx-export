@@ -13,4 +13,5 @@ export type Transaction = {
     to: string;
     crc: string;
     tc: string;
+    monthly_tc_demur: string;
 }

@@ -18,11 +18,21 @@ function formatDate(date: Date) {
     return `${year}-${formattedMonth}-${formattedDay} ${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
 }
 
+function formatDateMonthAndYearOnly(date: Date) {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1; // Month is zero-indexed, so add 1
+
+    // Add leading zeroes to ensure two digits for each value
+    const formattedMonth = month.toString().padStart(2, '0');
+
+    return `${year}-${formattedMonth}`;
+}
+
 export function generateTransactionHtmlTable(data: Transaction[]): string {
     let tableHTML = `<style>
                             /* Set font family and size for the entire document */
                             body {
-                              font-family: "Helvetica Neue", Arial, sans-serif;
+                              font-family: "Helvetica", Arial, sans-serif;
                               font-size: 16px;
                               line-height: 1.5;
                             }
@@ -67,7 +77,7 @@ export function generateTransactionHtmlTable(data: Transaction[]): string {
                       <table>
                       <thead>
                           <tr>
-                               <th colspan="5">Transactions of ${data.length > 0 ? data[0].to : ''}</th>
+                               <th colspan="6">Transactions of ${data.length > 0 ? data[0].to : ''}</th>
                           </tr>
                           <tr>
                               <th>Timestamp</th>
@@ -76,24 +86,34 @@ export function generateTransactionHtmlTable(data: Transaction[]): string {
                               <!--<th>To</th>-->
                               <th>Value (CRC)</th>
                               <th>Value (TC)</th>
+                              <th>Total demurrage in month (TC)</th>
                           </tr>
                       </thead>
                       <tbody>`;
 
     for (const row of data) {
-        tableHTML += `
+        if (parseFloat(row.monthly_tc_demur) > 0) {
+            tableHTML += `
+            <tr>
+              <td colspan="5">${formatDateMonthAndYearOnly(row.timestamp)}</td>
+              <td>${parseFloat(row.monthly_tc_demur).toFixed(3)}</td>
+            </tr>`;
+        } else {
+            tableHTML += `
             <tr>
               <td>${formatDate(row.timestamp)}</td>
               <td>
                 ${row.fromProfile?.avatarUrl
-            ? `<img style="width:32px; height:32px;" width="32" height="32" src="${row.fromProfile.avatarUrl}" alt="${row.fromProfile?.username}">`
-            : ''} ${row.fromProfile?.username}
+                ? `<img style="width:32px; height:32px;" width="32" height="32" src="${row.fromProfile.avatarUrl}" alt="${row.fromProfile?.username}">`
+                : `<img style="width:32px; height:32px;" width="32" height="32" src="">`} ${row.fromProfile?.username}
               </td>
               <td>${row.from}</td>
               <!--<td>${row.to}</td>-->
               <td style="color:${parseFloat(row.crc) >= 0 ? 'black' : 'red'}">${parseFloat(row.crc).toFixed(3)}</td>
               <td style="color:${parseFloat(row.crc) >= 0 ? 'black' : 'red'}">${parseFloat(row.tc).toFixed(3)}</td>
+              <td></td>
             </tr>`;
+        }
     }
     tableHTML += `</tbody></table>`;
     return tableHTML;
