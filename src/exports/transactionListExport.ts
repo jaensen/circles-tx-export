@@ -45,15 +45,28 @@ export async function findTransactions(recipientAddress: string): Promise<Transa
 
     try {
         const query = `
-            select t.timestamp
-                 , t.from
-                 , t.to
-                 , (t.value / 1000000000000000000)::text as crc
-                 , (crc_to_tc(extract(epoch from t.timestamp at time zone 'utc') * 1000, t.value) / 1000000000000000000)::text as tc
-            from crc_all_signups s
-                     join crc_hub_transfer_2 t on t."to" = s.user
-            where s.user = lower($1)
-            order by t.timestamp desc
+            with txs as (
+                select t.timestamp
+                     , t.from
+                     , t.to
+                     , (t.value / 1000000000000000000)::text as crc
+                     , (crc_to_tc(extract(epoch from t.timestamp at time zone 'utc') * 1000, t.value) / 1000000000000000000)::text as tc
+                from crc_all_signups s
+                         join crc_hub_transfer_2 t on t."to" = s.user
+                where s.user = lower($1)
+                union all
+                select t.timestamp
+                     , t.to
+                     , t.from
+                     , (-(t.value / 1000000000000000000))::text as crc
+                     , (-(crc_to_tc(extract(epoch from t.timestamp at time zone 'utc') * 1000, t.value) / 1000000000000000000))::text as tc
+                from crc_all_signups s
+                         join crc_hub_transfer_2 t on t."from" = s.user
+                where s.user = lower($1)
+            )
+            select *
+            from txs
+            order by timestamp desc
         `;
 
         const {rows} = await client.query(query, [recipientAddress.toLowerCase()]);
